@@ -11,7 +11,21 @@ import io
 from flask_cors import CORS
 
 app = Flask(__name__)
+
+### PARA CONSEGUIR RODAR A API E A APLICAÇÃO NO MESMO SERVIDOR
 CORS(app)
+
+### ordem de execucao:
+###
+### ->CONVERTER TODAS AS IMAGENS
+### http://127.0.0.1:5000/api/imagem_dicom_to_png
+###
+### ->LISTAR TODAS AS IMAGENS
+### http://127.0.0.1:5000/api/images
+###
+### ->CONSULTAR UMA IMAGEM
+### http://127.0.0.1:5000/api/images/00010004.png
+
 
 def is_dicom_file(file_path):
     try:
@@ -41,11 +55,10 @@ def obter_dimensoes(image_array, pixel_spacing, slice_thickness=None):
 
 def read_dicom_image(localDoArquivo,file_path):
     dicom_image = pydicom.dcmread(file_path)
+
     image_array = dicom_image.pixel_array
 
-    # Obtém informações de resolução espacial
-    pixel_spacing = dicom_image.PixelSpacing
-    slice_thickness = getattr(dicom_image, 'SliceThickness', None,)
+
 
     if 'PhotometricInterpretation' in dicom_image and dicom_image.PhotometricInterpretation == 'RGB':
         image_pil = Image.fromarray(image_array)
@@ -57,9 +70,25 @@ def read_dicom_image(localDoArquivo,file_path):
 
     local=localDoArquivo+'/imagem_salva3.png'
     image_pil.save(local, format='PNG')
-    largura_mm, altura_mm =obter_dimensoes(image_array, pixel_spacing, slice_thickness)  # Retorna o nome do arquivo salvo
+    # Obtém informações de resolução espacial
+    largura_mm = 0.0
+    altura_mm = 0.0
+    # Verifique se a tag de metadados 'PixelSpacing' está presente
+    if hasattr(dicom_image, 'PixelSpacing'):
+        # Verifique se o valor é diferente de None (ou qualquer outro critério específico)
+        if dicom_image.PixelSpacing is not None:
+            pixel_spacing = dicom_image.PixelSpacing
+            print("Pixel Spacing:", pixel_spacing)
+            pixel_spacing = dicom_image.PixelSpacing
+            slice_thickness = getattr(dicom_image, 'SliceThickness', None, )
+            largura_mm, altura_mm = obter_dimensoes(image_array, pixel_spacing,
+                                                    slice_thickness)  # Retorna o nome do arquivo salvo
+        else:
+            print("SE3M dicom_image.PixelSpacing")
+
 
     return local, largura_mm, altura_mm
+
 
 @app.route('/imagem_processar', methods=['POST'])
 def imagem_processar():
