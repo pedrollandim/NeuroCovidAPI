@@ -1,87 +1,41 @@
+import mysql.connector
 
-import pydicom
-import matplotlib.pyplot as plt
-from PIL import Image
-import numpy as np
+# Configurações do banco de dados
+db_config = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'root',
+    'database': 'neuro_covid'
+}
 
-def read_dicom_image(file_path):
-    # Carrega o arquivo DICOM
-    dicom_image = pydicom.dcmread(file_path)
+def realizar_login(email, senha):
+    # Conectar ao banco de dados
+    try:
+        conexao = mysql.connector.connect(**db_config)
+        cursor = conexao.cursor()
 
-    # Obtém a matriz de pixels da imagem
-    image_array = dicom_image.pixel_array
+        # Consultar o banco de dados para verificar as credenciais
+        query = "SELECT * FROM usuarios WHERE email = %s AND senha = %s"
+        cursor.execute(query, (email, senha))
 
-    #######1
-   ## Normaliza a matriz de pixels para o intervalo 0-255 (uint8)
-   #image_array_normalized = (
-   #            (image_array - np.min(image_array)) / (np.max(image_array) - np.min(image_array)) * 255).astype(
-   #    np.uint8)
+        # Recuperar o resultado da consulta
+        usuario = cursor.fetchone()
 
-   ## Converte a matriz para uma imagem PIL
-   #image_pil = Image.fromarray(image_array_normalized)
+        # Fechar a conexão
+        cursor.close()
+        conexao.close()
 
-   ## Salva a imagem PIL em formato PNG
-   #image_pil.save('imagem_salva0.png', format='PNG')
-    #######1
+        return usuario is not None
 
-    #######2
-    # Verifica se a imagem DICOM tem informações sobre a cor
-    if 'PhotometricInterpretation' in dicom_image and dicom_image.PhotometricInterpretation == 'RGB':
-        # Converte a matriz para uma imagem PIL colorida
-        image_pil = Image.fromarray(image_array)
-    else:
-        # Se for uma imagem em escala de cinza, apenas converte para uma imagem PIL
-        # Normaliza a matriz de pixels para o intervalo 0-255 (uint8)
-        image_array_normalized = (
-                    (image_array - np.min(image_array)) / (np.max(image_array) - np.min(image_array)) * 255).astype(
-            np.uint8)
-        image_pil = Image.fromarray(image_array_normalized)
+    except mysql.connector.Error as err:
+        print(f"Erro de banco de dados: {err}")
+        return False
 
-    # Salva a imagem PIL em formato PNG
-    image_pil.save('imagem_salva3.png', format='PNG')
-    #######2
+# Exemplo de uso
+email_digitado = input("Digite o email: ")
+senha_digitada = input("Digite a senha: ")
 
-
-    return image_array
-
-def plot_dicom_image(image_array):
-    # Exibe a imagem usando matplotlib
-    plt.imshow(image_array, cmap=plt.cm.gray)
-    plt.axis('off')
-    plt.show()
-
-def read_dicom_imageC(file_path, save_path='imagem_processada.png'):
-    # Carrega o arquivo DICOM
-    dicom_image = pydicom.dcmread(file_path)
-
-    # Obtém a matriz de pixels da imagem
-    image_array = dicom_image.pixel_array
-
-    # Converte a matriz para um tipo de dados numérico suportado
-    image_array = image_array.astype(np.uint16)  # ou outro tipo de dados apropriado
-
-    # Converte a matriz para uma imagem PIL
-    image_pil = Image.fromarray(image_array)
-
-    # Salva a imagem PIL
-    image_pil.save(save_path, format='PNG')
-
-    # Retorna o caminho onde a imagem foi salva
-    return save_path
-
-# Substitua 'seu_arquivo.dcm' pelo caminho do seu próprio arquivo DICOM
-file_path = '00010001'
-
-# Lê a imagem DICOM
-image_array = read_dicom_image(file_path)
-
-# Exibe a imagem
-plot_dicom_image(image_array)
-
-## Chamada da função com o caminho específico para salvar a imagem
-#caminho_salvo = read_dicom_imageC('00010001C.dcm', save_path='imagem_salva.png')
-#
-#print(f'Imagem salva em: {caminho_salvo}')
-
-
-
+if realizar_login(email_digitado, senha_digitada):
+    print("Login bem-sucedido!")
+else:
+    print("Credenciais inválidas.")

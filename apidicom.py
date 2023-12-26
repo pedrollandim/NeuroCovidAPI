@@ -8,6 +8,8 @@ import numpy as np
 import os
 import io
 
+from flask_mysqldb import MySQL
+
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -26,6 +28,14 @@ CORS(app)
 ### ->CONSULTAR UMA IMAGEM
 ### http://127.0.0.1:5000/api/images/00010004.png
 
+
+# Configurações do banco de dados
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'root'
+app.config['MYSQL_DB'] = 'neuro_covid'
+
+mysql = MySQL(app)
 
 def is_dicom_file(file_path):
     try:
@@ -260,6 +270,29 @@ def imagem_DICOM_PNG():
     # Retorna resultados
     return jsonify({'results': results})
 
+
+@app.route('/api/login', methods=['POST'])
+def login():
+
+    data = request.get_json()
+
+    email = data.get('email')
+    senha = data.get('senha')
+
+    if not email or not senha:
+        return jsonify({'error': 'Email e senha são obrigatórios'}), 400
+
+    cursor = mysql.connection.cursor()
+    cursor.execute('SELECT * FROM usuarios WHERE email = %s AND senha = %s', (email, senha))
+    usuario = cursor.fetchone()
+    cursor.close()
+
+    if usuario:
+        # Autenticação bem-sucedida
+        return jsonify({'message': 'Login bem-sucedido'})
+    else:
+        # Credenciais inválidas
+        return jsonify({'error': 'Credenciais inválidas'}), 401
 
 if __name__ == '__main__':
     app.run(debug=True)
