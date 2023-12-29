@@ -1,6 +1,6 @@
 import base64
 
-from flask import Flask, jsonify, request, send_file, abort
+from flask import Flask, jsonify, request, send_file, abort, render_template
 from io import BytesIO
 import pydicom
 from PIL import Image
@@ -285,14 +285,108 @@ def login():
     cursor = mysql.connection.cursor()
     cursor.execute('SELECT * FROM usuarios WHERE email = %s AND senha = %s', (email, senha))
     usuario = cursor.fetchone()
-    cursor.close()
+    #cursor.close()
 
+    print(usuario)
     if usuario:
         # Autenticação bem-sucedida
-        return jsonify({'message': 'Login bem-sucedido'})
+        return jsonify({'message': 'Login bem-sucedido',
+                        'usuario_Id':str(usuario[0]),
+                        'usuario_email':str(usuario[1]),
+                        'usuario_crm':str(usuario[3])})
     else:
         # Credenciais inválidas
         return jsonify({'error': 'Credenciais inválidas'}), 401
+
+
+@app.route('/api/salvar_imagem', methods=['POST'])
+def salvar_imagem():
+    try:
+        data = request.json  # Assume que os dados são enviados como JSON no corpo da solicitação
+
+        # Extrai os dados do objeto ImagemPaciente
+        nomeId = data['nomeId']
+        altura_imagem = data['altura_imagem']
+        largura_imagem = data['largura_imagem']
+        area_segmentada_calculada = data['area_segmentada_calculada']
+        segmentacao = data['segmentacao']
+        areas_segmentadas_pontos = data['areas_segmentadas_pontos']
+        imagem_png = data['imagem_png']
+        imagem_segmentada =data['imagem_segmentada']
+        usuariosLogados = data['usuariosLogados']
+
+        # Conecta ao MySQL e insere os dados
+        cursor = mysql.connection.cursor()
+        # Insere os dados na tabela
+        cursor.execute(
+            """INSERT INTO imagens_pacientes 
+            (nomeId, altura_imagem, largura_imagem, area_segmentada_calculada, 
+            segmentacao, areas_segmentadas_pontos, imagem_png, imagem_segmentada, usuariosLogados_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (nomeId or None, altura_imagem or None, largura_imagem or None, area_segmentada_calculada or None,
+             segmentacao or None, areas_segmentadas_pontos or None, imagem_png or None, imagem_segmentada or None,
+             usuariosLogados['id'])
+        )
+        # Commita a transação para salvar as alterações no banco de dados
+        mysql.connection.commit()
+        # Fecha o cursor e a conexão após a conclusão
+        cursor.close()
+        print("SC")
+
+        return jsonify({"message": "Dados salvos com sucesso!"})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)})
+
+
+@app.route('/api/visualizar_imagem/<int:id>')
+def visualizar_imagem(id):
+    try:
+        # Conecta ao MySQL e obtém a imagem a partir do BLOB
+        conn = mysql.connection
+        cursor = conn.cursor()
+        cursor.execute("SELECT imagem_png FROM imagens_pacientes WHERE id = %s", (id,))
+        imagem_blob = cursor.fetchone()[0]
+
+        # Trata exceção para imagem inválida
+        try:
+            # Converte o BLOB em uma imagem
+            imagem = Image.open(BytesIO(imagem_blob))
+        except Exception as e:
+            return f"Erro ao abrir a imagem: {str(e)}"
+
+        # Mostra a imagem (isso é apenas um exemplo - você pode querer retornar a imagem de outras maneiras no seu aplicativo)
+        imagem.show()
+
+        return render_template('visualizar_imagem.html', imagem=imagem)
+
+    except Exception as e:
+        return str(e)
+
+# Rota para inserir dados na tabela
+@app.route('/api/inserir_dados', methods=['POST'])
+def inserir_dados():
+    try:
+        data = request.json
+        nome = data['nome']
+
+        senha = data['senha']  # Novo campo adicionado
+
+        # Conecta ao MySQL e insere os dados
+        cursor = mysql.connection.cursor()
+        # Insere os dados na tabela
+        cursor.execute("INSERT INTO usuarios (email, senha) VALUES (%s, %s)", (nome, senha))
+        # Commita a transação para salvar as alterações no banco de dados
+        mysql.connection.commit()
+        # Fecha o cursor e a conexão após a conclusão
+        cursor.close()
+
+        return jsonify({"message": "Dados inseridos com sucesso!"})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
